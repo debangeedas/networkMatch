@@ -8,6 +8,7 @@
     "start": "next start -p 3000"
   },
   "dependencies": {
+    "@netlify/plugin-nextjs": "^5.15.9",
     "networkmatch": "file:..",
     "next": "14.2.5",
     "react": "^18.3.1",
