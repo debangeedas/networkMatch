@@ -1,0 +1,13 @@
+{
+  "name": "networkmatch",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"backend,admin,user\" --prefix-colors \"cyan,magenta,green\" \"npm run dev --prefix backend\" \"npm run dev --prefix admin\" \"npm run dev --prefix user\"",
+    "install:all": "npm install --prefix backend && npm install --prefix admin && npm install --prefix user",
+    "db:init": "npm run db:init --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

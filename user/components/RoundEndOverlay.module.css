@@ -1,0 +1,165 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 15, 26, 0.92);
+  display: flex;
+  align-items: flex-end;
+  z-index: 100;
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } }
+
+.panel {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  padding: 32px 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: slideUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.dismissBtn {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: auto;
+  min-width: 30px;
+}
+.dismissBtn:hover { background: var(--border); color: var(--text); }
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.celebration {
+  font-size: 48px;
+  text-align: center;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.message {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.connections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.connectionsTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.connectionRow {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.connInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.connAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.connName { font-weight: 600; font-size: 15px; }
+.connRole { font-size: 12px; color: var(--text-muted); }
+
+.connActions {
+  display: flex;
+  gap: 8px;
+}
+
+.saveBtn, .savedBtn {
+  flex: 1;
+  padding: 9px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  width: auto;
+}
+.saveBtn { background: var(--accent); color: white; border: none; }
+.savedBtn { background: rgba(82, 212, 140, 0.15); color: var(--success); border: 1px solid rgba(82, 212, 140, 0.3); }
+
+.linkedinBtn {
+  padding: 9px 14px;
+  font-size: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: auto;
+  font-weight: 600;
+}
+
+.msgBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.msgText {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  background: var(--surface);
+  padding: 10px;
+  border-radius: var(--radius-sm);
+}
+.copyBtn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 9px;
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  width: 100%;
+}

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Users/user/networkMatch && npm install)",
+      "Bash(cd /c/Users/user/networkMatch && echo \"=== Backend routes ===\" && grep -n \"router\\\\.\\\\\\(put\\\\|delete\\\\\\)\" backend/src/routes/events.js && echo \"=== Admin api ===\" && grep -n \"updateEvent\\\\|deleteEvent\" admin/lib/api.ts && echo \"=== Join page ===\" && grep -n \"isReturningUser\\\\|continueToLobby\\\\|returningBanner\" user/app/join/[eventId]/page.tsx | head -10 && echo \"=== Lobby ===\" && grep -n \"handleLeave\\\\|handleEditProfile\\\\|showLeaveConfirm\" user/app/event/[eventId]/lobby/page.tsx | head -8 && echo \"=== Match page ===\" && grep -n \"showMenu\\\\|handleLeave\\\\|socketStatus\\\\|onDismiss\" user/app/event/[eventId]/match/page.tsx | head -10 && echo \"=== RoundEndOverlay ===\" && grep -n \"onDismiss\\\\|dismissBtn\" user/components/RoundEndOverlay.tsx)",
+      "Bash(cd \"C:\\\\Users\\\\user\\\\networkMatch\\\\backend\" && npm install 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\user\\\\networkMatch\\\\backend\" && node -e \"\nrequire\\('dotenv'\\).config\\(\\);\nconst { pool } = require\\('./src/db/index'\\);\npool.query\\('ALTER TABLE event_participants ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT false'\\)\n  .then\\(\\(\\) => { console.log\\('Migration done'\\); process.exit\\(0\\); }\\)\n  .catch\\(e => { console.error\\('Migration failed:', e.message\\); process.exit\\(1\\); }\\);\n\")",
+      "Bash(gh auth status 2>&1)",
+      "Bash(git --version 2>&1 && curl --version 2>&1 | head -1)"
+    ]
+  }
+}
