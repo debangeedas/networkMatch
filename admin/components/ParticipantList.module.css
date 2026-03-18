@@ -106,7 +106,7 @@
   border-radius: 10px;
   font-weight: 500;
 }
-.tagLooking { background: rgba(108, 99, 255, 0.15); color: var(--accent); }
+.tagLooking { background: var(--accent-light); color: var(--accent); }
 .tagOffering { background: rgba(76, 175, 135, 0.15); color: var(--success); }
 
 .joined {

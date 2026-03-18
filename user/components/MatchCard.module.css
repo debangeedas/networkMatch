@@ -58,8 +58,8 @@
 }
 
 .reason {
-  background: rgba(124, 111, 255, 0.08);
-  border: 1px solid rgba(124, 111, 255, 0.25);
+  background: var(--accent-light);
+  border: 1px solid rgba(212, 146, 14, 0.2);
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
@@ -118,7 +118,7 @@
 }
 .saveBtn {
   background: var(--accent);
-  color: white;
+  color: #0d0b08;
   border: none;
 }
 .saveBtn:hover { opacity: 0.9; }
@@ -178,7 +178,7 @@
 
 .copyBtn {
   background: var(--accent);
-  color: white;
+  color: #0d0b08;
   border: none;
   padding: 10px;
   font-size: 13px;
