@@ -101,6 +101,9 @@ export default function LobbyPage() {
           <button className="btn-primary" style={{ marginTop: 24 }} onClick={() => router.push('/connections')}>
             View My Connections
           </button>
+          <button className="btn-secondary" style={{ marginTop: 10 }} onClick={() => router.push('/')}>
+            Go to Home
+          </button>
         </div>
       </div>
     );

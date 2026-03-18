@@ -28,12 +28,27 @@ export default function HomePage() {
     }
 
     setUser(JSON.parse(stored));
-    setActiveEventId(localStorage.getItem('nm_event_id'));
 
-    api.getMyConnections()
-      .then(setEvents)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const storedEventId = localStorage.getItem('nm_event_id');
+
+    const connectionsPromise = api.getMyConnections().then(setEvents).catch(() => {});
+
+    // Only show the active event banner if the event hasn't ended
+    const eventCheckPromise = storedEventId
+      ? api.getEventPublic(storedEventId)
+          .then((e) => {
+            if (e.status === 'ended') {
+              localStorage.removeItem('nm_event_id');
+            } else {
+              setActiveEventId(storedEventId);
+            }
+          })
+          .catch(() => {
+            localStorage.removeItem('nm_event_id');
+          })
+      : Promise.resolve();
+
+    Promise.all([connectionsPromise, eventCheckPromise]).finally(() => setLoading(false));
   }, []);
 
   const handleSignOut = () => {
