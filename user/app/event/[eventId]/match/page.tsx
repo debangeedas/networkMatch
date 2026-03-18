@@ -126,7 +126,7 @@ export default function MatchPage() {
         connected_user_id: connectedUserId,
         match_id: match?.match_id,
       });
-      setSavedConnections((prev) => new Set([...prev, connectedUserId]));
+      setSavedConnections((prev) => { const next = new Set(prev); next.add(connectedUserId); return next; });
     } catch (err: any) {
       setError(err.message);
     }
