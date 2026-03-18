@@ -225,6 +225,7 @@
 }
 @keyframes modalIn { from { transform: scale(0.92); opacity: 0; } }
 
+.modalIcon { font-size: 48px; text-align: center; margin-bottom: 12px; }
 .modalTitle { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
 .modalDesc { font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; }
 .modalActions { display: flex; gap: 10px; }

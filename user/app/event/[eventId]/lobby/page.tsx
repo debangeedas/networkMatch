@@ -13,6 +13,7 @@ export default function LobbyPage() {
   const [event, setEvent] = useState<any>(null);
   const [participantCount, setParticipantCount] = useState(0);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [eventEnded, setEventEnded] = useState(false);
   const socketRef = useRef<any>(null);
 
   useEffect(() => {
@@ -52,10 +53,12 @@ export default function LobbyPage() {
 
     socket.on('event_state', ({ status: s }: any) => {
       if (s === 'active') router.replace(`/event/${eventId}/match`);
+      if (s === 'ended') setEventEnded(true);
     });
 
     socket.on('round_started', () => router.replace(`/event/${eventId}/match`));
     socket.on('match_assigned', () => router.replace(`/event/${eventId}/match`));
+    socket.on('event_ended', () => setEventEnded(true));
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -64,6 +67,7 @@ export default function LobbyPage() {
       socket.off('event_state');
       socket.off('round_started');
       socket.off('match_assigned');
+      socket.off('event_ended');
     };
   }, [eventId, router]);
 
@@ -136,6 +140,24 @@ export default function LobbyPage() {
           </div>
         )}
       </div>
+
+      {/* Event Ended */}
+      {eventEnded && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <div className={styles.modalIcon}>🎉</div>
+            <h3 className={styles.modalTitle}>Event Has Ended</h3>
+            <p className={styles.modalDesc}>
+              Thanks for joining! Check out the connections you made tonight.
+            </p>
+            <div className={styles.modalActions}>
+              <button className="btn-primary" onClick={() => router.push('/connections')}>
+                View My Connections
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Leave confirmation */}
       {showLeaveConfirm && (

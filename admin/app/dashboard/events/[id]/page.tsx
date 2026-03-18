@@ -37,6 +37,7 @@ export default function EventControlPage() {
 
   // Modals
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showEndEventConfirm, setShowEndEventConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', description: '', duration_per_round: 300 });
@@ -100,6 +101,12 @@ export default function EventControlPage() {
       setTimeout(() => setRoundStatus(''), 4000);
     });
 
+    socket.on('event_ended', () => {
+      setEvent((prev: any) => prev ? { ...prev, status: 'ended' } : prev);
+      setTimer(null);
+      setActionLoading(false);
+    });
+
     socket.on('timer_tick', ({ remaining, total }: any) => {
       setTimer({ remaining, total });
     });
@@ -120,6 +127,7 @@ export default function EventControlPage() {
       socket.off('participant_count');
       socket.off('round_started');
       socket.off('round_ended');
+      socket.off('event_ended');
       socket.off('timer_tick');
       socket.off('event_state');
       socket.off('error');
@@ -139,6 +147,14 @@ export default function EventControlPage() {
     setActionLoading(true);
     setError('');
     socketRef.current.emit('end_round', { eventId: id });
+  };
+
+  const handleEndEventConfirmed = () => {
+    if (!socketRef.current) return;
+    setShowEndEventConfirm(false);
+    setActionLoading(true);
+    setError('');
+    socketRef.current.emit('end_event', { eventId: id });
   };
 
   const handleSaveEdit = async () => {
@@ -186,6 +202,7 @@ export default function EventControlPage() {
 
   const timerPercent = timer ? (timer.remaining / timer.total) * 100 : 100;
   const isActive = event?.status === 'active';
+  const isEnded = event?.status === 'ended';
   const activeParticipants = participants.filter((p) => p.is_active);
   const estimatedPairs = Math.floor(activeParticipants.length / 2);
 
@@ -258,29 +275,44 @@ export default function EventControlPage() {
           </div>
 
           <div className={styles.heroRight}>
-            <div className={styles.roundButtons}>
-              <button
-                className="btn-primary"
-                onClick={handleStartRound}
-                disabled={actionLoading || activeParticipants.length < 2}
-              >
-                {actionLoading && !isActive ? <span className="spinner" /> : `▶ Start Round ${(event?.current_round || 0) + 1}`}
-              </button>
-              <button
-                className="btn-danger"
-                onClick={() => setShowEndConfirm(true)}
-                disabled={actionLoading || !isActive}
-              >
-                ■ End Round
-              </button>
-            </div>
-            <p className={styles.hintText}>
-              {activeParticipants.length < 2
-                ? `Need 2+ active participants to start (${participants.length} joined, ${activeParticipants.length} active)`
-                : isActive
-                ? 'End early or let the timer run out'
-                : `${activeParticipants.length} active · ${participants.length} total`}
-            </p>
+            {isEnded ? (
+              <div className={styles.eventEndedMsg}>
+                This event has ended. All rounds are complete.
+              </div>
+            ) : (
+              <>
+                <div className={styles.roundButtons}>
+                  <button
+                    className="btn-primary"
+                    onClick={handleStartRound}
+                    disabled={actionLoading || activeParticipants.length < 2}
+                  >
+                    {actionLoading && !isActive ? <span className="spinner" /> : `▶ Start Round ${(event?.current_round || 0) + 1}`}
+                  </button>
+                  <button
+                    className="btn-danger"
+                    onClick={() => setShowEndConfirm(true)}
+                    disabled={actionLoading || !isActive}
+                  >
+                    ■ End Round
+                  </button>
+                </div>
+                <p className={styles.hintText}>
+                  {activeParticipants.length < 2
+                    ? `Need 2+ active participants to start (${participants.length} joined, ${activeParticipants.length} active)`
+                    : isActive
+                    ? 'End early or let the timer run out'
+                    : `${activeParticipants.length} active · ${participants.length} total`}
+                </p>
+                <button
+                  className={styles.endEventBtn}
+                  onClick={() => setShowEndEventConfirm(true)}
+                  disabled={actionLoading}
+                >
+                  ⏹ End Event
+                </button>
+              </>
+            )}
             {error && <p className="error-msg" style={{ marginTop: 8 }}>{error}</p>}
           </div>
         </div>
@@ -378,6 +410,22 @@ export default function EventControlPage() {
             <div className={styles.modalActions}>
               <button className="btn-secondary" onClick={() => setShowEndConfirm(false)}>Cancel</button>
               <button className="btn-danger" onClick={handleEndRoundConfirmed}>End Round Now</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* End Event Confirmation */}
+      {showEndEventConfirm && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <h3 className={styles.modalTitle}>End This Event?</h3>
+            <p className={styles.modalDesc}>
+              This will close the event for all participants — they'll see an "event ended" screen and be directed to their saved connections. No more rounds can be started after this.
+            </p>
+            <div className={styles.modalActions}>
+              <button className="btn-secondary" onClick={() => setShowEndEventConfirm(false)}>Cancel</button>
+              <button className="btn-danger" onClick={handleEndEventConfirmed}>End Event</button>
             </div>
           </div>
         </div>

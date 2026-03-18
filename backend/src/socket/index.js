@@ -136,6 +136,12 @@ function setupSocket(io) {
           timer: timerState ? { remaining: timerState.remaining, total: timerState.total } : null,
         });
 
+        // If event already ended, immediately notify the joiner
+        if (event.status === 'ended') {
+          socket.emit('event_ended', { message: 'This event has already ended.' });
+          return;
+        }
+
         // If round is active and user just joined — send their match if available
         if (user.role === 'user' && event.status === 'active') {
           const matchResult = await db.query(
@@ -327,6 +333,37 @@ function setupSocket(io) {
       } catch (err) {
         console.error('[Socket] end_round error:', err);
         socket.emit('error', { message: 'Failed to end round' });
+      }
+    });
+
+    // --- ADMIN: END EVENT ---
+    socket.on('end_event', async ({ eventId }) => {
+      if (user.role !== 'admin') {
+        socket.emit('error', { message: 'Admin only' });
+        return;
+      }
+
+      try {
+        const eventResult = await db.query('SELECT * FROM events WHERE id = $1 AND admin_id = $2', [
+          eventId,
+          user.id,
+        ]);
+        if (eventResult.rows.length === 0) {
+          socket.emit('error', { message: 'Event not found or not yours' });
+          return;
+        }
+
+        stopTimer(eventId);
+        await db.query("UPDATE events SET status = 'ended' WHERE id = $1", [eventId]);
+
+        io.to(`event:${eventId}`).emit('event_ended', {
+          message: 'The event has ended. Thanks for joining!',
+        });
+
+        console.log(`[Socket] Event ${eventId} ended by admin`);
+      } catch (err) {
+        console.error('[Socket] end_event error:', err);
+        socket.emit('error', { message: 'Failed to end event' });
       }
     });
 

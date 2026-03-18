@@ -18,6 +18,7 @@ export default function MatchPage() {
   const [timer, setTimer] = useState<{ remaining: number; total: number } | null>(null);
   const [roundEnded, setRoundEnded] = useState(false);
   const [roundEndMsg, setRoundEndMsg] = useState('');
+  const [eventEnded, setEventEnded] = useState(false);
   const [savedConnections, setSavedConnections] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -62,6 +63,13 @@ export default function MatchPage() {
     socket.on('event_state', ({ status, timer: t }: any) => {
       if (t) setTimer(t);
       if (status === 'waiting') setRoundEnded(true);
+      if (status === 'ended') setEventEnded(true);
+    });
+
+    socket.on('event_ended', () => {
+      setEventEnded(true);
+      setRoundEnded(false);
+      setTimer(null);
     });
 
     socket.on('match_assigned', (data: any) => {
@@ -95,6 +103,7 @@ export default function MatchPage() {
       socket.off('timer_tick');
       socket.off('round_started');
       socket.off('round_ended');
+      socket.off('event_ended');
       socket.off('error');
     };
   }, [eventId, router]);
@@ -278,6 +287,24 @@ export default function MatchPage() {
           </div>
         )}
       </div>
+
+      {/* Event Ended Screen */}
+      {eventEnded && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <div className={styles.eventEndedIcon}>🎉</div>
+            <h3 className={styles.modalTitle}>Event Has Ended</h3>
+            <p className={styles.modalDesc}>
+              Thanks for joining! Check out the connections you made tonight.
+            </p>
+            <div className={styles.modalActions}>
+              <button className="btn-primary" onClick={() => router.push('/connections')}>
+                View My Connections
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Round End Overlay */}
       {roundEnded && (
