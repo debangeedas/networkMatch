@@ -15,6 +15,7 @@ export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [events, setEvents] = useState<EventGroup[]>([]);
+  const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function HomePage() {
     }
 
     setUser(JSON.parse(stored));
+    setActiveEventId(localStorage.getItem('nm_event_id'));
 
     api.getMyConnections()
       .then(setEvents)
@@ -40,6 +42,7 @@ export default function HomePage() {
     localStorage.removeItem('nm_event_id');
     setUser(null);
     setEvents([]);
+    setActiveEventId(null);
   };
 
   if (loading) {
@@ -86,6 +89,23 @@ export default function HomePage() {
       </header>
 
       <div className={styles.container}>
+
+        {/* Active event banner */}
+        {activeEventId && (
+          <button
+            className={styles.activeEventBanner}
+            onClick={() => router.push(`/event/${activeEventId}/lobby`)}
+          >
+            <div className={styles.activeEventLeft}>
+              <span className={styles.activeEventDot} />
+              <div>
+                <div className={styles.activeEventLabel}>Active event</div>
+                <div className={styles.activeEventSub}>Tap to return to the lobby</div>
+              </div>
+            </div>
+            <span className={styles.activeEventArrow}>→</span>
+          </button>
+        )}
 
         {/* Stats strip */}
         {events.length > 0 && (

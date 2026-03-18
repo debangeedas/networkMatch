@@ -114,6 +114,9 @@ export default function LobbyPage() {
           <span className={styles.eventName}>{event?.name || 'Event Lobby'}</span>
         </div>
         <div className={styles.headerActions}>
+          <button className={styles.actionBtn} onClick={() => router.push('/')} title="Home">
+            🏠 Home
+          </button>
           <button className={styles.actionBtn} onClick={handleEditProfile} title="Edit profile">
             ✏️ Edit Profile
           </button>
