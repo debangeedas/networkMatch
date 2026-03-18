@@ -76,6 +76,13 @@ CREATE TABLE IF NOT EXISTS saved_connections (
   UNIQUE(user_id, connected_user_id, event_id)
 );
 
+-- Migration: add auth columns to users
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_code VARCHAR(6);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMPTZ;
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_idx ON users(email) WHERE email IS NOT NULL;
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_event_participants_event ON event_participants(event_id);
 CREATE INDEX IF NOT EXISTS idx_event_participants_user ON event_participants(user_id);
