@@ -15,6 +15,8 @@ const INTERESTS_OPTIONS = [
   'Venture capital', 'Product', 'Design', 'Growth', 'Sales',
 ];
 
+type Step = 'email' | 'login' | 'otp' | 'register';
+
 export default function JoinPage() {
   const router = useRouter();
   const { eventId } = useParams<{ eventId: string }>();
@@ -23,8 +25,22 @@ export default function JoinPage() {
   const [loadingEvent, setLoadingEvent] = useState(true);
   const [eventError, setEventError] = useState('');
 
+  // localStorage shortcut state
   const [isReturningUser, setIsReturningUser] = useState(false);
   const [existingUserId, setExistingUserId] = useState<string | null>(null);
+  const [existingUserName, setExistingUserName] = useState('');
+  const [existingUserRole, setExistingUserRole] = useState('');
+  const [existingUserCompany, setExistingUserCompany] = useState('');
+
+  // Multi-step auth state
+  const [step, setStep] = useState<Step>('email');
+  const [email, setEmail] = useState('');
+  const [lookedUpName, setLookedUpName] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+
   const [form, setForm] = useState({
     name: '',
     linkedin: '',
@@ -42,19 +58,12 @@ export default function JoinPage() {
     const storedEventId = localStorage.getItem('nm_event_id');
 
     if (stored && storedEventId === eventId) {
-      // Returning user — pre-fill form, let them update or continue
       const user = JSON.parse(stored);
       setIsReturningUser(true);
       setExistingUserId(user.id);
-      setForm({
-        name: user.name || '',
-        linkedin: user.linkedin || '',
-        role: user.role || '',
-        company: user.company || '',
-        looking_for: user.looking_for || [],
-        offering: user.offering || [],
-        interests: user.interests || [],
-      });
+      setExistingUserName(user.name || '');
+      setExistingUserRole(user.role || '');
+      setExistingUserCompany(user.company || '');
     }
 
     api.getEventPublic(eventId)
@@ -63,9 +72,11 @@ export default function JoinPage() {
       .finally(() => setLoadingEvent(false));
   }, [eventId]);
 
+  // localStorage shortcut: same-device returning user
   const continueToLobby = async () => {
     if (!existingUserId) return;
     setSubmitting(true);
+    setError('');
     try {
       const res = await api.joinEvent({ event_id: eventId, user_id: existingUserId });
       localStorage.setItem('user_token', res.token);
@@ -78,6 +89,93 @@ export default function JoinPage() {
     }
   };
 
+  const saveAndGoLobby = (token: string, user: any) => {
+    localStorage.setItem('user_token', token);
+    localStorage.setItem('nm_user', JSON.stringify(user));
+    localStorage.setItem('nm_event_id', eventId);
+    router.push(`/event/${eventId}/lobby`);
+  };
+
+  // Step: email — lookup
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) { setError('Please enter your email'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await api.lookup(email.trim());
+      if (res.exists) {
+        setLookedUpName(res.name || '');
+        setStep('login');
+      } else {
+        setStep('register');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Step: login — password auth
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) { setError('Please enter your password'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await api.login(email.trim(), password);
+      // Join the event with the authenticated user
+      const joinRes = await api.joinEvent({ event_id: eventId, user_id: res.user.id });
+      saveAndGoLobby(joinRes.token, joinRes.user);
+    } catch (err: any) {
+      setError(err.message);
+      setSubmitting(false);
+    }
+  };
+
+  // Step: login → send OTP (forgot password)
+  const handleSendOTP = async () => {
+    setSubmitting(true);
+    setError('');
+    try {
+      await api.sendOTP(email.trim());
+      setOtpSent(true);
+      setStep('otp');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Step: otp — verify code
+  const handleOTPSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otp.trim()) { setError('Please enter the code'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await api.verifyOTP(email.trim(), otp.trim());
+      const joinRes = await api.joinEvent({ event_id: eventId, user_id: res.user.id });
+      saveAndGoLobby(joinRes.token, joinRes.user);
+    } catch (err: any) {
+      setError(err.message);
+      setSubmitting(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    setError('');
+    try {
+      await api.sendOTP(email.trim());
+      setOtpSent(true);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  // Step: register — new user
   const toggleItem = (field: 'looking_for' | 'offering' | 'interests', value: string) => {
     setForm((prev) => {
       const arr = prev[field];
@@ -88,19 +186,20 @@ export default function JoinPage() {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { setError('Please enter your name'); return; }
+    if (password && password !== confirmPassword) { setError('Passwords do not match'); return; }
     setSubmitting(true);
     setError('');
     try {
-      const payload: any = { ...form, event_id: eventId };
-      if (existingUserId) payload.user_id = existingUserId;
-      const res = await api.joinEvent(payload);
-      localStorage.setItem('user_token', res.token);
-      localStorage.setItem('nm_user', JSON.stringify(res.user));
-      localStorage.setItem('nm_event_id', eventId);
-      router.push(`/event/${eventId}/lobby`);
+      const res = await api.joinEvent({
+        ...form,
+        event_id: eventId,
+        email: email.trim(),
+        password: password || undefined,
+      });
+      saveAndGoLobby(res.token, res.user);
     } catch (err: any) {
       setError(err.message);
       setSubmitting(false);
@@ -145,23 +244,32 @@ export default function JoinPage() {
         <div className={styles.intro}>
           <div className={styles.logoMini}>N</div>
           <h1 className={styles.title}>
-            {isReturningUser ? 'Update Your Profile' : 'Join the Event'}
+            {step === 'login' ? `Welcome back${lookedUpName ? `, ${lookedUpName.split(' ')[0]}` : ''}!`
+              : step === 'otp' ? 'Check your email'
+              : step === 'register' ? 'Join the Event'
+              : isReturningUser ? 'Welcome back!' : 'Join the Event'}
           </h1>
           <p className={styles.subtitle}>
-            {isReturningUser
-              ? 'Update your info or continue with your existing profile'
-              : 'Tell us about yourself so we can make great matches'}
+            {step === 'login' ? 'Enter your password to continue'
+              : step === 'otp' ? `We sent a 6-digit code to ${email}`
+              : step === 'register' ? 'Tell us about yourself so we can make great matches'
+              : isReturningUser ? 'You were here before — continue or sign in on a new device'
+              : 'Enter your email to get started'}
           </p>
         </div>
 
-        {/* Returning user shortcut */}
-        {isReturningUser && (
+        {/* localStorage shortcut — same-device returning user */}
+        {isReturningUser && step === 'email' && (
           <div className={styles.returningBanner}>
             <div className={styles.returningLeft}>
-              <div className={styles.returningAvatar}>{form.name.charAt(0).toUpperCase()}</div>
+              <div className={styles.returningAvatar}>{existingUserName.charAt(0).toUpperCase()}</div>
               <div>
-                <div className={styles.returningName}>{form.name}</div>
-                {form.role && <div className={styles.returningRole}>{form.role}{form.company ? ` @ ${form.company}` : ''}</div>}
+                <div className={styles.returningName}>{existingUserName}</div>
+                {existingUserRole && (
+                  <div className={styles.returningRole}>
+                    {existingUserRole}{existingUserCompany ? ` @ ${existingUserCompany}` : ''}
+                  </div>
+                )}
               </div>
             </div>
             <button
@@ -175,115 +283,248 @@ export default function JoinPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          {isReturningUser && (
-            <p className={styles.editHint}>Or edit your profile below and save changes:</p>
-          )}
-
-          {/* Basic Info */}
-          <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>About You</h2>
-            <div className={styles.field}>
-              <label>Your Name *</label>
-              <input
-                type="text"
-                placeholder="Jane Smith"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                autoFocus={!isReturningUser}
-              />
-            </div>
-            <div className={styles.fieldRow}>
+        {/* Step: email */}
+        {step === 'email' && (
+          <form onSubmit={handleEmailSubmit} className={styles.form}>
+            {isReturningUser && (
+              <p className={styles.editHint}>Or sign in with a different account:</p>
+            )}
+            <div className={styles.section}>
               <div className={styles.field}>
-                <label>Role</label>
+                <label>Email address</label>
                 <input
-                  type="text"
-                  placeholder="e.g. Founder, Engineer"
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })}
-                />
-              </div>
-              <div className={styles.field}>
-                <label>Company</label>
-                <input
-                  type="text"
-                  placeholder="Company name"
-                  value={form.company}
-                  onChange={(e) => setForm({ ...form, company: e.target.value })}
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoFocus={!isReturningUser}
                 />
               </div>
             </div>
-            <div className={styles.field}>
-              <label>LinkedIn URL</label>
-              <input
-                type="url"
-                placeholder="https://linkedin.com/in/yourname"
-                value={form.linkedin}
-                onChange={(e) => setForm({ ...form, linkedin: e.target.value })}
-              />
+            {error && <p className="error-msg">{error}</p>}
+            <button type="submit" className="btn-primary" disabled={submitting}>
+              {submitting ? <span className="spinner" /> : 'Continue →'}
+            </button>
+          </form>
+        )}
+
+        {/* Step: login */}
+        {step === 'login' && (
+          <form onSubmit={handleLoginSubmit} className={styles.form}>
+            <div className={styles.section}>
+              <div className={styles.field}>
+                <label>Password</label>
+                <input
+                  type="password"
+                  placeholder="Your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoFocus
+                />
+              </div>
             </div>
-          </div>
+            {error && <p className="error-msg">{error}</p>}
+            <button type="submit" className="btn-primary" disabled={submitting}>
+              {submitting ? <span className="spinner" /> : 'Log in →'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ marginTop: 8 }}
+              onClick={handleSendOTP}
+              disabled={submitting}
+            >
+              Forgot password? Send me a code
+            </button>
+            <button
+              type="button"
+              className={styles.backLink}
+              onClick={() => { setStep('email'); setError(''); setPassword(''); }}
+            >
+              ← Use a different email
+            </button>
+          </form>
+        )}
 
-          {/* Looking For */}
-          <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>What are you looking for?</h2>
-            <p className={styles.sectionHint}>Select all that apply</p>
-            <div className={styles.tagGrid}>
-              {LOOKING_FOR_OPTIONS.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  className={`tag ${form.looking_for.includes(opt) ? 'tag-active' : ''}`}
-                  onClick={() => toggleItem('looking_for', opt)}
-                >
-                  {opt}
-                </button>
-              ))}
+        {/* Step: otp */}
+        {step === 'otp' && (
+          <form onSubmit={handleOTPSubmit} className={styles.form}>
+            <div className={styles.section}>
+              <div className={styles.field}>
+                <label>6-digit code</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="123456"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  autoFocus
+                />
+              </div>
             </div>
-          </div>
+            {error && <p className="error-msg">{error}</p>}
+            <button type="submit" className="btn-primary" disabled={submitting}>
+              {submitting ? <span className="spinner" /> : 'Verify →'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ marginTop: 8 }}
+              onClick={handleResendOTP}
+              disabled={submitting}
+            >
+              Resend code
+            </button>
+            <button
+              type="button"
+              className={styles.backLink}
+              onClick={() => { setStep('login'); setError(''); setOtp(''); }}
+            >
+              ← Back to login
+            </button>
+          </form>
+        )}
 
-          {/* Offering */}
-          <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>What can you offer?</h2>
-            <p className={styles.sectionHint}>Select all that apply</p>
-            <div className={styles.tagGrid}>
-              {LOOKING_FOR_OPTIONS.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  className={`tag ${form.offering.includes(opt) ? 'tag-active' : ''}`}
-                  onClick={() => toggleItem('offering', opt)}
-                >
-                  {opt}
-                </button>
-              ))}
+        {/* Step: register */}
+        {step === 'register' && (
+          <form onSubmit={handleRegisterSubmit} className={styles.form}>
+            {/* Basic Info */}
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>About You</h2>
+              <div className={styles.field}>
+                <label>Email address</label>
+                <input type="email" value={email} readOnly style={{ opacity: 0.6 }} />
+              </div>
+              <div className={styles.field}>
+                <label>Your Name *</label>
+                <input
+                  type="text"
+                  placeholder="Jane Smith"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  autoFocus
+                />
+              </div>
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <label>Role</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Founder, Engineer"
+                    value={form.role}
+                    onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label>Company</label>
+                  <input
+                    type="text"
+                    placeholder="Company name"
+                    value={form.company}
+                    onChange={(e) => setForm({ ...form, company: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className={styles.field}>
+                <label>LinkedIn URL</label>
+                <input
+                  type="url"
+                  placeholder="https://linkedin.com/in/yourname"
+                  value={form.linkedin}
+                  onChange={(e) => setForm({ ...form, linkedin: e.target.value })}
+                />
+              </div>
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <label>Password</label>
+                  <input
+                    type="password"
+                    placeholder="Set a password (optional)"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label>Confirm Password</label>
+                  <input
+                    type="password"
+                    placeholder="Repeat password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Interests */}
-          <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>Your Interests</h2>
-            <p className={styles.sectionHint}>What sectors or topics excite you?</p>
-            <div className={styles.tagGrid}>
-              {INTERESTS_OPTIONS.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  className={`tag ${form.interests.includes(opt) ? 'tag-active' : ''}`}
-                  onClick={() => toggleItem('interests', opt)}
-                >
-                  {opt}
-                </button>
-              ))}
+            {/* Looking For */}
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>What are you looking for?</h2>
+              <p className={styles.sectionHint}>Select all that apply</p>
+              <div className={styles.tagGrid}>
+                {LOOKING_FOR_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={`tag ${form.looking_for.includes(opt) ? 'tag-active' : ''}`}
+                    onClick={() => toggleItem('looking_for', opt)}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {error && <p className="error-msg">{error}</p>}
+            {/* Offering */}
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>What can you offer?</h2>
+              <p className={styles.sectionHint}>Select all that apply</p>
+              <div className={styles.tagGrid}>
+                {LOOKING_FOR_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={`tag ${form.offering.includes(opt) ? 'tag-active' : ''}`}
+                    onClick={() => toggleItem('offering', opt)}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting ? <span className="spinner" /> : isReturningUser ? 'Save Changes & Enter Lobby' : 'Join Event →'}
-          </button>
-        </form>
+            {/* Interests */}
+            <div className={styles.section}>
+              <h2 className={styles.sectionTitle}>Your Interests</h2>
+              <p className={styles.sectionHint}>What sectors or topics excite you?</p>
+              <div className={styles.tagGrid}>
+                {INTERESTS_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    className={`tag ${form.interests.includes(opt) ? 'tag-active' : ''}`}
+                    onClick={() => toggleItem('interests', opt)}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {error && <p className="error-msg">{error}</p>}
+
+            <button type="submit" className="btn-primary" disabled={submitting}>
+              {submitting ? <span className="spinner" /> : 'Join Event →'}
+            </button>
+            <button
+              type="button"
+              className={styles.backLink}
+              onClick={() => { setStep('email'); setError(''); }}
+            >
+              ← Use a different email
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

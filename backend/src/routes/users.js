@@ -1,14 +1,105 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const db = require('../db');
 const { userAuth } = require('../middleware/auth');
 const { generateLinkedInMessage } = require('../ai/generator');
+const { sendOTP } = require('../lib/email');
 
 const router = express.Router();
 
+// POST /api/users/lookup — Check if email exists
+router.post('/lookup', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email required' });
+  try {
+    const result = await db.query(
+      'SELECT name, role, company FROM users WHERE email = $1',
+      [email.toLowerCase()]
+    );
+    if (result.rows.length === 0) return res.json({ exists: false });
+    const { name, role, company } = result.rows[0];
+    return res.json({ exists: true, name, role, company });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/users/login — Email + password login
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+  try {
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
+    const user = result.rows[0];
+    if (!user.password_hash) return res.status(401).json({ error: 'Invalid credentials' });
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+    const token = jwt.sign({ id: user.id, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const { password_hash, otp_code, otp_expires_at, ...safeUser } = user;
+    return res.json({ token, user: safeUser });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/users/otp/send — Send OTP to email
+router.post('/otp/send', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'email required' });
+  try {
+    const result = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (result.rows.length === 0) return res.status(400).json({ error: 'No account found with that email' });
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 10 * 60 * 1000);
+    await db.query(
+      'UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE email = $3',
+      [otp, expires, email.toLowerCase()]
+    );
+    await sendOTP(email, otp);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/users/otp/verify — Verify OTP and issue token
+router.post('/otp/verify', async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) return res.status(400).json({ error: 'email and otp required' });
+  try {
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [email.toLowerCase()]);
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Invalid or expired code' });
+    const user = result.rows[0];
+    if (
+      !user.otp_code ||
+      user.otp_code !== otp ||
+      !user.otp_expires_at ||
+      new Date(user.otp_expires_at) < new Date()
+    ) {
+      return res.status(401).json({ error: 'Invalid or expired code' });
+    }
+    // Clear OTP fields
+    await db.query(
+      'UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE id = $1',
+      [user.id]
+    );
+    const token = jwt.sign({ id: user.id, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const { password_hash, otp_code, otp_expires_at, ...safeUser } = user;
+    return res.json({ token, user: safeUser });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/users/join — Join event and create/update profile
 router.post('/join', async (req, res) => {
-  const { event_id, name, linkedin, role, company, looking_for, offering, interests, user_id } = req.body;
+  const { event_id, name, linkedin, role, company, looking_for, offering, interests, user_id, email, password } = req.body;
 
   if (!event_id) return res.status(400).json({ error: 'event_id required' });
   if (!name && !user_id) return res.status(400).json({ error: 'name required for new users' });
@@ -37,9 +128,10 @@ router.post('/join', async (req, res) => {
       if (updateResult.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     } else {
       // New user — create profile
+      const passwordHash = password ? await bcrypt.hash(password, 10) : null;
       const createResult = await db.query(
-        `INSERT INTO users (name, linkedin, role, company, looking_for, offering, interests)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+        `INSERT INTO users (name, linkedin, role, company, looking_for, offering, interests, email, password_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
         [
           name,
           linkedin || null,
@@ -48,6 +140,8 @@ router.post('/join', async (req, res) => {
           looking_for || [],
           offering || [],
           interests || [],
+          email ? email.toLowerCase() : null,
+          passwordHash,
         ]
       );
       userId = createResult.rows[0].id;
@@ -60,9 +154,12 @@ router.post('/join', async (req, res) => {
     );
 
     // Issue user token
-    const token = jwt.sign({ id: userId, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ id: userId, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
-    const userResult = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const userResult = await db.query(
+      'SELECT id, name, linkedin, role, company, looking_for, offering, interests, email, created_at FROM users WHERE id = $1',
+      [userId]
+    );
     const user = userResult.rows[0];
 
     return res.json({ token, user });
@@ -75,7 +172,10 @@ router.post('/join', async (req, res) => {
 // GET /api/users/me — Get own profile (user)
 router.get('/me', userAuth, async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+    const result = await db.query(
+      'SELECT id, name, linkedin, role, company, looking_for, offering, interests, email, created_at FROM users WHERE id = $1',
+      [req.user.id]
+    );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     return res.json(result.rows[0]);
   } catch (err) {
@@ -96,7 +196,7 @@ router.put('/me', userAuth, async (req, res) => {
         looking_for = COALESCE($5, looking_for),
         offering = COALESCE($6, offering),
         interests = COALESCE($7, interests)
-       WHERE id = $8 RETURNING *`,
+       WHERE id = $8 RETURNING id, name, linkedin, role, company, looking_for, offering, interests, email, created_at`,
       [name, linkedin, role, company, looking_for, offering, interests, req.user.id]
     );
     return res.json(result.rows[0]);

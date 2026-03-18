@@ -26,6 +26,21 @@ export const api = {
   getEventPublic: (eventId: string) =>
     request<any>(`/api/events/${eventId}/public`),
 
+  lookup: (email: string) =>
+    request<{ exists: boolean; name?: string; role?: string; company?: string }>(
+      '/api/users/lookup', { method: 'POST', body: JSON.stringify({ email }) }),
+
+  login: (email: string, password: string) =>
+    request<{ token: string; user: any }>(
+      '/api/users/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+
+  sendOTP: (email: string) =>
+    request<{}>('/api/users/otp/send', { method: 'POST', body: JSON.stringify({ email }) }),
+
+  verifyOTP: (email: string, otp: string) =>
+    request<{ token: string; user: any }>(
+      '/api/users/otp/verify', { method: 'POST', body: JSON.stringify({ email, otp }) }),
+
   joinEvent: (data: {
     event_id: string;
     name?: string;
@@ -36,6 +51,8 @@ export const api = {
     offering?: string[];
     interests?: string[];
     user_id?: string;
+    email?: string;
+    password?: string;
   }) => request<{ token: string; user: any }>('/api/users/join', { method: 'POST', body: JSON.stringify(data) }),
 
   getMe: () => request<any>('/api/users/me'),
