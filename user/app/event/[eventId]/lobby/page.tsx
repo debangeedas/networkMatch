@@ -30,9 +30,8 @@ export default function LobbyPage() {
     api.getEventPublic(eventId)
       .then((e) => {
         setEvent(e);
-        if (e.status === 'active') {
-          router.replace(`/event/${eventId}/match`);
-        }
+        if (e.status === 'active') router.replace(`/event/${eventId}/match`);
+        if (e.status === 'ended') setEventEnded(true);
       })
       .catch(() => router.replace(`/join/${eventId}`));
 
@@ -83,6 +82,29 @@ export default function LobbyPage() {
     // Navigate to join page — pre-fill logic will handle showing existing data
     router.push(`/join/${eventId}`);
   };
+
+  if (eventEnded) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <div className={styles.logo}>N</div>
+            <span className={styles.eventName}>{event?.name || 'Event'}</span>
+          </div>
+        </div>
+        <div className={styles.content}>
+          <div className={styles.endedIcon}>🎉</div>
+          <h1 className={styles.title}>This event has ended</h1>
+          <p className={styles.subtitle}>
+            Thanks for joining{event?.name ? ` ${event.name}` : ''}! Hope you made some great connections.
+          </p>
+          <button className="btn-primary" style={{ marginTop: 24 }} onClick={() => router.push('/connections')}>
+            View My Connections
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -140,24 +162,6 @@ export default function LobbyPage() {
           </div>
         )}
       </div>
-
-      {/* Event Ended */}
-      {eventEnded && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <div className={styles.modalIcon}>🎉</div>
-            <h3 className={styles.modalTitle}>Event Has Ended</h3>
-            <p className={styles.modalDesc}>
-              Thanks for joining! Check out the connections you made tonight.
-            </p>
-            <div className={styles.modalActions}>
-              <button className="btn-primary" onClick={() => router.push('/connections')}>
-                View My Connections
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Leave confirmation */}
       {showLeaveConfirm && (
