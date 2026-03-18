@@ -57,6 +57,10 @@ export const api = {
 
   getMe: () => request<any>('/api/users/me'),
 
+  getMyConnections: () =>
+    request<{ event_id: string; event_name: string; event_date: string; connections: any[] }[]>(
+      '/api/users/me/connections'),
+
   getMyMatch: (eventId: string) => request<{ match: any }>(`/api/events/${eventId}/my-match`),
 
   saveConnection: (eventId: string, data: { connected_user_id: string; match_id?: string }) =>

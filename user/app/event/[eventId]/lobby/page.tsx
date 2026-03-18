@@ -91,6 +91,9 @@ export default function LobbyPage() {
           <button className={styles.actionBtn} onClick={handleEditProfile} title="Edit profile">
             ✏️ Edit Profile
           </button>
+          <button className={styles.actionBtn} onClick={() => router.push('/connections')} title="My connections">
+            🤝 Connections
+          </button>
           <button className={styles.leaveBtn} onClick={() => setShowLeaveConfirm(true)} title="Leave event">
             Leave
           </button>

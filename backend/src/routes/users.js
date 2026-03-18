@@ -169,6 +169,39 @@ router.post('/join', async (req, res) => {
   }
 });
 
+// GET /api/users/me/connections — All saved connections grouped by event (user)
+router.get('/me/connections', userAuth, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT
+         e.id          AS event_id,
+         e.name        AS event_name,
+         e.created_at  AS event_date,
+         json_agg(
+           json_build_object(
+             'id',       u.id,
+             'name',     u.name,
+             'role',     u.role,
+             'company',  u.company,
+             'linkedin', u.linkedin,
+             'saved_at', sc.saved_at
+           ) ORDER BY sc.saved_at ASC
+         ) AS connections
+       FROM saved_connections sc
+       JOIN events e ON e.id = sc.event_id
+       JOIN users  u ON u.id = sc.connected_user_id
+       WHERE sc.user_id = $1
+       GROUP BY e.id, e.name, e.created_at
+       ORDER BY e.created_at DESC`,
+      [req.user.id]
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/users/me — Get own profile (user)
 router.get('/me', userAuth, async (req, res) => {
   try {

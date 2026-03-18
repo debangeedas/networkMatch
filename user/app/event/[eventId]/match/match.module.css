@@ -167,6 +167,8 @@
   padding: 3px 9px;
   border-radius: 20px;
   animation: fadeIn 0.3s ease;
+  cursor: pointer;
+  width: auto;
 }
 @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } }
 

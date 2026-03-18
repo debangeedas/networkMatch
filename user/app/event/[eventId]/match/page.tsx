@@ -181,7 +181,9 @@ export default function MatchPage() {
         </div>
         <div className={styles.headerRight}>
           {savedConnections.size > 0 && (
-            <span className={styles.savedCounter}>{savedConnections.size} saved</span>
+            <button className={styles.savedCounter} onClick={() => router.push('/connections')}>
+              {savedConnections.size} saved
+            </button>
           )}
 
           {/* Connection status dot */}
@@ -200,6 +202,9 @@ export default function MatchPage() {
               <div className={styles.dropdown}>
                 <button className={styles.dropdownItem} onClick={handleEditProfile}>
                   ✏️ Edit Profile
+                </button>
+                <button className={styles.dropdownItem} onClick={() => { setShowMenu(false); router.push('/connections'); }}>
+                  🤝 My Connections
                 </button>
                 <button
                   className={`${styles.dropdownItem} ${styles.dropdownItemDanger}`}
