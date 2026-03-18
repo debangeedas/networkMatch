@@ -6,7 +6,30 @@ import { getUserSocket, disconnectSocket } from '../../../../lib/socket';
 import MatchCard from '../../../../components/MatchCard';
 import TimerRing from '../../../../components/TimerRing';
 import RoundEndOverlay from '../../../../components/RoundEndOverlay';
+import Compass from '../../../../components/Compass';
 import styles from './match.module.css';
+
+// ── Geo helpers ──────────────────────────────────────────────────
+function calcBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLng = toRad(lng2 - lng1);
+  const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+  const x =
+    Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+    Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
+function calcDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export default function MatchPage() {
   const router = useRouter();
@@ -28,8 +51,17 @@ export default function MatchPage() {
   const [showMenu, setShowMenu] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
+  // Compass state
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [matchLocation, setMatchLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
+  const [compassDismissed, setCompassDismissed] = useState(false);
+  const [locationDenied, setLocationDenied] = useState(false);
+
   const socketRef = useRef<any>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const geoWatchRef = useRef<number | null>(null);
+  const locationSendRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('user_token');
@@ -76,6 +108,8 @@ export default function MatchPage() {
       setMatch(data);
       setRoundEnded(false);
       setTimer(null);
+      setMatchLocation(null);
+      setCompassDismissed(false);
     });
 
     socket.on('timer_tick', ({ remaining, total }: any) => {
@@ -93,6 +127,10 @@ export default function MatchPage() {
       setTimer(null);
     });
 
+    socket.on('match_location_update', ({ lat, lng }: any) => {
+      setMatchLocation({ lat, lng });
+    });
+
     socket.on('error', ({ message }: any) => setError(message));
 
     return () => {
@@ -104,9 +142,71 @@ export default function MatchPage() {
       socket.off('round_started');
       socket.off('round_ended');
       socket.off('event_ended');
+      socket.off('match_location_update');
       socket.off('error');
     };
   }, [eventId, router]);
+
+  // Geolocation watch
+  useEffect(() => {
+    if (!navigator.geolocation) { setLocationDenied(true); return; }
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocationDenied(false);
+      },
+      () => setLocationDenied(true),
+      { enableHighAccuracy: true, maximumAge: 3000 }
+    );
+    geoWatchRef.current = id;
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
+
+  // Device orientation (compass heading)
+  useEffect(() => {
+    const handler = (e: DeviceOrientationEvent) => {
+      const webkit = (e as any).webkitCompassHeading; // iOS
+      if (webkit != null) {
+        setDeviceHeading(webkit);
+      } else if (e.alpha != null) {
+        setDeviceHeading((360 - e.alpha + 360) % 360);
+      }
+    };
+    const requestAndListen = async () => {
+      if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+        try {
+          const perm = await (DeviceOrientationEvent as any).requestPermission();
+          if (perm !== 'granted') return;
+        } catch { return; }
+      }
+      if ('ondeviceorientationabsolute' in window) {
+        window.addEventListener('deviceorientationabsolute', handler as EventListener);
+      } else {
+        window.addEventListener('deviceorientation', handler as EventListener);
+      }
+    };
+    requestAndListen();
+    return () => {
+      window.removeEventListener('deviceorientationabsolute', handler as EventListener);
+      window.removeEventListener('deviceorientation', handler as EventListener);
+    };
+  }, []);
+
+  // Send location to backend every 3 s while match is active
+  useEffect(() => {
+    if (!userLocation || !match || !socketRef.current) return;
+    const send = () => {
+      socketRef.current?.emit('update_location', {
+        eventId,
+        lat: userLocation.lat,
+        lng: userLocation.lng,
+      });
+    };
+    send();
+    const interval = setInterval(send, 3000);
+    locationSendRef.current = interval;
+    return () => clearInterval(interval);
+  }, [userLocation, match, eventId]);
 
   // Warn before closing/refreshing the tab
   useEffect(() => {
@@ -162,6 +262,17 @@ export default function MatchPage() {
     setShowMenu(false);
     router.push(`/join/${eventId}`);
   };
+
+  // Compass derived values
+  const bearing = userLocation && matchLocation
+    ? calcBearing(userLocation.lat, userLocation.lng, matchLocation.lat, matchLocation.lng)
+    : null;
+  const distance = userLocation && matchLocation
+    ? calcDistance(userLocation.lat, userLocation.lng, matchLocation.lat, matchLocation.lng)
+    : null;
+  const matchFound = distance !== null && distance < 8;
+  const firstMatchedUser = match?.matched_users?.[0];
+  const showCompass = !!match && !compassDismissed && !roundEnded && !eventEnded;
 
   if (loading) {
     return (
@@ -227,8 +338,23 @@ export default function MatchPage() {
         </div>
       </header>
 
-      {/* Intent chip row */}
-      {user && (() => {
+      {/* Compass — shown when match assigned and not yet dismissed/found */}
+      {showCompass && (
+        <Compass
+          bearing={bearing}
+          deviceHeading={deviceHeading}
+          distance={distance}
+          matchName={firstMatchedUser?.name || 'Your match'}
+          matchRole={firstMatchedUser?.role}
+          matchCompany={firstMatchedUser?.company}
+          found={matchFound}
+          locationDenied={locationDenied}
+          onSkip={() => setCompassDismissed(true)}
+        />
+      )}
+
+      {/* Intent chip row — hidden while compass is showing */}
+      {!showCompass && user && (() => {
         const chips = [
           ...(user.looking_for || []).slice(0, 2),
           ...(user.interests || []).slice(0, 2),
@@ -243,7 +369,7 @@ export default function MatchPage() {
         ) : null;
       })()}
 
-      <div className={styles.content}>
+      <div className={styles.content} style={showCompass ? { display: 'none' } : undefined}>
         {error && <p className="error-msg" style={{ marginBottom: 16 }}>{error}</p>}
 
         {socketStatus === 'disconnected' && (
