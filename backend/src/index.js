@@ -15,7 +15,8 @@ const server = http.createServer(app);
 const allowedOrigins = [
   process.env.CLIENT_ADMIN_URL || 'http://localhost:3001',
   process.env.CLIENT_USER_URL || 'http://localhost:3000',
-];
+  process.env.CLIENT_USER_URL_PREVIEW,
+].filter(Boolean);
 
 const io = new Server(server, {
   cors: {
