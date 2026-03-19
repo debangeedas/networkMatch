@@ -172,6 +172,9 @@ export default function MatchPage() {
         setDeviceHeading((360 - e.alpha + 360) % 360);
       }
     };
+    const eventName: string = 'ondeviceorientationabsolute' in window
+      ? 'deviceorientationabsolute'
+      : 'deviceorientation';
     const requestAndListen = async () => {
       if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
         try {
@@ -179,16 +182,11 @@ export default function MatchPage() {
           if (perm !== 'granted') return;
         } catch { return; }
       }
-      if ('ondeviceorientationabsolute' in window) {
-        window.addEventListener('deviceorientationabsolute', handler as EventListener);
-      } else {
-        window.addEventListener('deviceorientation', handler as EventListener);
-      }
+      window.addEventListener(eventName, handler as EventListener);
     };
     requestAndListen();
     return () => {
-      window.removeEventListener('deviceorientationabsolute', handler as EventListener);
-      window.removeEventListener('deviceorientation', handler as EventListener);
+      window.removeEventListener(eventName, handler as EventListener);
     };
   }, []);
 
