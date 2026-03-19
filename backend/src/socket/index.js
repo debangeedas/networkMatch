@@ -8,6 +8,12 @@ const { runMatchingAlgorithm } = require('../matching/algorithm');
 const activeTimers = new Map();
 
 /**
+ * In-memory user locations: `${userId}:${eventId}` -> { lat, lng }
+ * Ephemeral — not persisted to DB.
+ */
+const userLocations = new Map();
+
+/**
  * Connected sockets: socketId -> { role, id, eventId }
  */
 const socketMeta = new Map();
@@ -333,6 +339,44 @@ function setupSocket(io) {
       } catch (err) {
         console.error('[Socket] end_round error:', err);
         socket.emit('error', { message: 'Failed to end round' });
+      }
+    });
+
+    // --- USER: SHARE LOCATION ---
+    socket.on('update_location', async ({ eventId, lat, lng }) => {
+      if (user.role !== 'user') return;
+
+      userLocations.set(`${user.id}:${eventId}`, { lat, lng });
+
+      try {
+        const eventResult = await db.query(
+          'SELECT current_round FROM events WHERE id = $1',
+          [eventId]
+        );
+        if (!eventResult.rows.length || !eventResult.rows[0].current_round) return;
+        const { current_round } = eventResult.rows[0];
+
+        const matchResult = await db.query(
+          `SELECT user1_id, user2_id, user3_id FROM matches
+           WHERE event_id = $1 AND round_number = $2
+             AND (user1_id = $3 OR user2_id = $3 OR user3_id = $3)`,
+          [eventId, current_round, user.id]
+        );
+        if (!matchResult.rows.length) return;
+
+        const m = matchResult.rows[0];
+        const partnerIds = [m.user1_id, m.user2_id, m.user3_id].filter(
+          (id) => id && id !== user.id
+        );
+
+        const socketsInRoom = await io.in(`event:${eventId}`).fetchSockets();
+        for (const s of socketsInRoom) {
+          if (partnerIds.includes(s.data.user?.id) && s.data.user?.role === 'user') {
+            s.emit('match_location_update', { lat, lng });
+          }
+        }
+      } catch (err) {
+        console.error('[Socket] update_location error:', err);
       }
     });
 
