@@ -207,7 +207,7 @@ export default function MatchPage() {
       });
     };
     send();
-    const interval = setInterval(send, 3000);
+    const interval = setInterval(send, 500);
     locationSendRef.current = interval;
     return () => clearInterval(interval);
   }, [userLocation, match, eventId]);
