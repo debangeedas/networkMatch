@@ -86,6 +86,12 @@ export default function MatchPage() {
     const socket = getUserSocket(token);
     socketRef.current = socket;
 
+    // If socket is already connected (navigated from lobby), re-join immediately
+    // so the backend sends back event_state + match_assigned for the active round.
+    if (socket.connected) {
+      socket.emit('join_event', { eventId });
+    }
+
     socket.on('connect', () => {
       setSocketStatus('connected');
       socket.emit('join_event', { eventId });
