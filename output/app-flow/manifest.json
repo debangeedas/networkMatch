@@ -1,0 +1,38 @@
+{
+  "generatedAt": "2026-04-06T15:38:10.374Z",
+  "eventId": "d51073d8-bf1f-4acc-9c1d-7b0b487efdf4",
+  "admin": {
+    "email": "codex-docs-admin-1775489593993203@example.com"
+  },
+  "users": {
+    "alexEmail": "alex-rivera-1775489593993203@example.com",
+    "mayaEmail": "maya-chen-1775489593993203@example.com",
+    "registerPreviewEmail": "new-attendee-1775489593993203@example.com"
+  },
+  "screenshots": {
+    "admin_login": "output/app-flow/screenshots/admin-login.png",
+    "admin_register": "output/app-flow/screenshots/admin-register.png",
+    "admin_dashboard": "output/app-flow/screenshots/admin-dashboard.png",
+    "admin_create_event": "output/app-flow/screenshots/admin-create-event.png",
+    "admin_event_waiting": "output/app-flow/screenshots/admin-event-waiting.png",
+    "admin_participants_drawer": "output/app-flow/screenshots/admin-participants-drawer.png",
+    "admin_qr_drawer": "output/app-flow/screenshots/admin-qr-drawer.png",
+    "admin_edit_modal": "output/app-flow/screenshots/admin-edit-modal.png",
+    "user_home_guest": "output/app-flow/screenshots/user-home-guest.png",
+    "user_join_email": "output/app-flow/screenshots/user-join-email.png",
+    "user_join_login": "output/app-flow/screenshots/user-join-login.png",
+    "user_join_otp": "output/app-flow/screenshots/user-join-otp.png",
+    "user_join_register": "output/app-flow/screenshots/user-join-register.png",
+    "user_lobby": "output/app-flow/screenshots/user-lobby.png",
+    "admin_event_active": "output/app-flow/screenshots/admin-event-active.png",
+    "user_match": "output/app-flow/screenshots/user-match.png",
+    "user_round_complete": "output/app-flow/screenshots/user-round-complete.png",
+    "user_home_signed_in": "output/app-flow/screenshots/user-home-signed-in.png",
+    "user_connections": "output/app-flow/screenshots/user-connections.png",
+    "admin_event_ended": "output/app-flow/screenshots/admin-event-ended.png",
+    "user_event_ended": "output/app-flow/screenshots/user-event-ended.png"
+  },
+  "notes": {
+    "otpScreenshotCaptured": true
+  }
+}
