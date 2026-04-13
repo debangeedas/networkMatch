@@ -118,21 +118,3 @@ npm run dev
 | `round_ended` | Server → All | Round ended notification |
 | `participant_count` | Server → All | Updated participant count |
 | `event_state` | Server → Client | Current state on join (for late joiners) |
-
-## Environment Variables
-
-### Backend (`backend/.env`)
-```
-PORT=4000
-DATABASE_URL=postgresql://postgres:password@localhost:5432/networkmatch
-JWT_SECRET=your-secret-key
-ADMIN_INVITE_CODE=admin123
-CLIENT_ADMIN_URL=http://localhost:3001
-CLIENT_USER_URL=http://localhost:3000
-```
-
-### Admin + User apps (`.env.local`)
-```
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_WS_URL=http://localhost:4000
-```
